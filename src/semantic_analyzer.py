@@ -1,6 +1,6 @@
 from lark import Token, Tree
 import pandas as pd
-from validator import (
+from src.validator import (
     mapa_modelos,
     transformadores_com_vazamento,
     metricas_validas,

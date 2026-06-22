@@ -1,0 +1,19 @@
+from src.config import (
+    MAPA_MODELOS,
+    MAPA_MODELOS_SKLEARN,
+    MAPA_TRANSFORMADORES_SKLEARN,
+    MAPA_ESCALADORES_SKLEARN,
+    MAPA_METRICAS_SKLEARN,
+    METRICAS_VALIDAS,
+    PARAMS_VALIDOS,
+    TRANSFORMADORES_COM_VAZAMENTO
+)
+
+mapa_modelos = MAPA_MODELOS
+mapa_modelos_sklearn = MAPA_MODELOS_SKLEARN
+mapa_transformadores_sklearn = MAPA_TRANSFORMADORES_SKLEARN
+mapa_scalers_sklearn = MAPA_ESCALADORES_SKLEARN
+mapa_metricas_sklearn = MAPA_METRICAS_SKLEARN
+metricas_validas = METRICAS_VALIDAS
+params_validos = PARAMS_VALIDOS
+transformadores_com_vazamento = TRANSFORMADORES_COM_VAZAMENTO

@@ -1,7 +1,7 @@
 import pandas as pd
 from sklearn.model_selection import train_test_split
 from sklearn.preprocessing import LabelEncoder
-from validator import (
+from src.validator import (
     mapa_modelos_sklearn,
     mapa_transformadores_sklearn,
     mapa_scalers_sklearn,

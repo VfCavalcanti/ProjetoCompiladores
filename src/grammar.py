@@ -1,7 +1,7 @@
 from lark import Lark
 
 
-gramatica = Lark("""
+gramatica = Lark(r"""
 start: comando+
 
 ?comando : dataset
@@ -32,7 +32,6 @@ corpo_pipeline: passo_pipeline ("," passo_pipeline)*
 param_split: TEST_SIZE "=" NUMERO
            | RANDOM_STATE "=" NUMERO
 
-// CORRIGIDO: inlinados, sem ramo intermediário inútil
 ?params_modelo: "{" lista_params "}"
               | "(" lista_params_inline ")"
 
@@ -45,15 +44,13 @@ param: IDENTIFIER "=" valor_param
 lista_params_inline: param_inline ("," param_inline)*
 param_inline: IDENTIFIER "=" valor_param
 
-// CORRIGIDO: inlinado, sem ramo intermediário inútil
 ?valor_param: NUMERO
             | STRING
             | BOOLEAN
             | IDENTIFIER
 
-// =========================
-// TOKENS
-// =========================
+
+// TOKENS:
 
 PROBLEMA: "classification"
          | "regression"

@@ -10,7 +10,9 @@ from sklearn.metrics import (
     mean_squared_error, mean_absolute_error, r2_score
 )
 
-mapa_modelos = {
+# Mapa de nomes DSL para nomes de classe sklearn (strings)
+# Usado na análise semântica
+MAPA_MODELOS = {
     'RandomForest': {
         'classification': 'RandomForestClassifier',
         'regression': 'RandomForestRegressor'
@@ -24,23 +26,56 @@ mapa_modelos = {
     }
 }
 
-mapa_transformadores = {
-    'StandardScaler': 'StandardScaler',
-    'PCA': 'PCA',
-    'SelectKBest': 'SelectKBest'
+# Mapa de nomes DSL para classes sklearn
+# Usado na execução
+MAPA_MODELOS_SKLEARN = {
+    'RandomForest': {
+        'classification': RandomForestClassifier,
+        'regression': RandomForestRegressor
+    },
+    'SVM': {
+        'classification': SVC,
+        'regression': SVR
+    },
+    'LinearRegression': {
+        'regression': LinearRegression
+    }
 }
 
-mapa_scalers = {
-    'standard': 'StandardScaler',
-    'minmax': 'MinMaxScaler'
+MAPA_TRANSFORMADORES_SKLEARN = {
+    'StandardScaler': StandardScaler,
+    'PCA': PCA,
+    'SelectKBest': SelectKBest
 }
 
-metricas_validas = {
+MAPA_ESCALADORES_SKLEARN = {
+    'standard': StandardScaler,
+    'minmax': MinMaxScaler
+}
+
+MAPA_METRICAS_SKLEARN = {
+    'classification': {
+        'accuracy': accuracy_score,
+        'precision': lambda y, y_pred: precision_score(y, y_pred, average='weighted'),
+        'recall': lambda y, y_pred: recall_score(y, y_pred, average='weighted'),
+        'f1': lambda y, y_pred: f1_score(y, y_pred, average='weighted')
+    },
+    'regression': {
+        'mse': mean_squared_error,
+        'rmse': lambda y, y_pred: np.sqrt(mean_squared_error(y, y_pred)),
+        'mae': mean_absolute_error,
+        'r2': r2_score
+    }
+}
+
+# Métricas válidas por tipo de problema
+METRICAS_VALIDAS = {
     'classification': {'accuracy', 'precision', 'recall', 'f1'},
     'regression': {'mse', 'rmse', 'mae', 'r2'}
 }
 
-params_validos = {
+# Parâmetros válidos para cada modelo/transformador
+PARAMS_VALIDOS = {
     'RandomForest': {
         'n_estimators': {'tipo': int, 'min': 1},
         'max_depth': {'tipo': int, 'min': 1},
@@ -64,44 +99,6 @@ params_validos = {
     }
 }
 
-transformadores_com_vazamento = {'StandardScaler', 'PCA', 'SelectKBest'}
+# Transformadores que causam vazamento de dados
+TRANSFORMADORES_COM_VAZAMENTO = {'StandardScaler', 'PCA', 'SelectKBest'}
 
-mapa_modelos_sklearn = {
-    'RandomForest': {
-        'classification': RandomForestClassifier,
-        'regression': RandomForestRegressor
-    },
-    'SVM': {
-        'classification': SVC,
-        'regression': SVR
-    },
-    'LinearRegression': {
-        'regression': LinearRegression
-    }
-}
-
-mapa_transformadores_sklearn = {
-    'StandardScaler': StandardScaler,
-    'PCA': PCA,
-    'SelectKBest': SelectKBest
-}
-
-mapa_scalers_sklearn = {
-    'standard': StandardScaler,
-    'minmax': MinMaxScaler
-}
-
-mapa_metricas_sklearn = {
-    'classification': {
-        'accuracy': accuracy_score,
-        'precision': lambda y, y_pred: precision_score(y, y_pred, average='weighted'),
-        'recall': lambda y, y_pred: recall_score(y, y_pred, average='weighted'),
-        'f1': lambda y, y_pred: f1_score(y, y_pred, average='weighted')
-    },
-    'regression': {
-        'mse': mean_squared_error,
-        'rmse': lambda y, y_pred: np.sqrt(mean_squared_error(y, y_pred)),
-        'mae': mean_absolute_error,
-        'r2': r2_score
-    }
-}
