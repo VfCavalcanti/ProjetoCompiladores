@@ -1,10 +1,11 @@
 import numpy as np
-from sklearn.ensemble import RandomForestClassifier, RandomForestRegressor
+from sklearn.ensemble import RandomForestClassifier, RandomForestRegressor, GradientBoostingClassifier, GradientBoostingRegressor
 from sklearn.svm import SVC, SVR
-from sklearn.linear_model import LinearRegression
-from sklearn.preprocessing import StandardScaler, MinMaxScaler
+from sklearn.linear_model import LinearRegression, LogisticRegression, Ridge, Lasso
+from sklearn.preprocessing import StandardScaler, MinMaxScaler, RobustScaler
 from sklearn.decomposition import PCA
-from sklearn.feature_selection import SelectKBest
+from sklearn.feature_selection import SelectKBest, f_classif, f_regression
+from sklearn.preprocessing import PolynomialFeatures
 from sklearn.metrics import (
     accuracy_score, precision_score, recall_score, f1_score,
     mean_squared_error, mean_absolute_error, r2_score
@@ -23,7 +24,20 @@ MAPA_MODELOS = {
     },
     'LinearRegression': {
         'regression': 'LinearRegression'
-    }
+    },
+    'GradientBoosting': {
+        'classification': 'GradientBoostingClassifier',
+        'regression': 'GradientBoostingRegressor'
+    },
+    'LogisticRegression': {
+        'classification': 'LogisticRegression'
+    },
+    'Ridge': {
+        'regression': 'Ridge'
+    },
+    'Lasso': {
+        'regression': 'Lasso'
+    },
 }
 
 # Mapa de nomes DSL para classes sklearn
@@ -39,13 +53,34 @@ MAPA_MODELOS_SKLEARN = {
     },
     'LinearRegression': {
         'regression': LinearRegression
-    }
+    },
+    'GradientBoosting': {
+        'classification': GradientBoostingClassifier,
+        'regression': GradientBoostingRegressor
+    },
+    'LogisticRegression': {
+        'classification': LogisticRegression
+    },
+    'Ridge': {
+        'regression': Ridge
+    },
+    'Lasso': {
+        'regression': Lasso
+    },
+}
+
+# Mapa de strings de score_func para funções sklearn
+MAPA_SCORE_FUNC = {
+    'f_classif': f_classif,
+    'f_regression': f_regression,
 }
 
 MAPA_TRANSFORMADORES_SKLEARN = {
     'StandardScaler': StandardScaler,
     'PCA': PCA,
-    'SelectKBest': SelectKBest
+    'SelectKBest': SelectKBest,
+    'RobustScaler': RobustScaler,
+    'PolynomialFeatures': PolynomialFeatures,
 }
 
 MAPA_ESCALADORES_SKLEARN = {
@@ -89,15 +124,39 @@ PARAMS_VALIDOS = {
     'LinearRegression': {
         'fit_intercept': {'tipo': bool},
     },
+    'GradientBoosting': {
+        'n_estimators': {'tipo': int, 'min': 1},
+        'max_depth': {'tipo': int, 'min': 1},
+        'learning_rate': {'tipo': float, 'min': 0},
+        'random_state': {'tipo': int}
+    },
+    'LogisticRegression': {
+        'C': {'tipo': float, 'min': 0},
+        'max_iter': {'tipo': int, 'min': 1},
+        'random_state': {'tipo': int}
+    },
+    'Ridge': {
+        'alpha': {'tipo': float, 'min': 0},
+        'fit_intercept': {'tipo': bool},
+    },
+    'Lasso': {
+        'alpha': {'tipo': float, 'min': 0},
+        'fit_intercept': {'tipo': bool},
+        'max_iter': {'tipo': int, 'min': 1},
+    },
     'PCA': {
         'n_components': {'tipo': int, 'min': 1},
         'random_state': {'tipo': int}
     },
     'SelectKBest': {
-        'k': {'tipo': int, 'min': 1}
-    }
+        'k': {'tipo': int, 'min': 1},
+        'score_func': {'tipo': str, 'opcoes': ['f_classif', 'f_regression']}
+    },
+    'RobustScaler': {},
+    'PolynomialFeatures': {
+        'degree': {'tipo': int, 'min': 2},
+    },
 }
 
 # Transformadores que causam vazamento de dados
-TRANSFORMADORES_COM_VAZAMENTO = {'StandardScaler', 'PCA', 'SelectKBest'}
-
+TRANSFORMADORES_COM_VAZAMENTO = {'StandardScaler', 'PCA', 'SelectKBest', 'RobustScaler', 'PolynomialFeatures'}

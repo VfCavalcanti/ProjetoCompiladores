@@ -529,10 +529,10 @@ def analiseSemantica(tree):
             for passo in ctx['pipeline']
         )
         if ctx['scaler'] == 'standard' and tem_standard_scaler:
-            ctx['warnings'].append({
+            ctx['erros'].append({
                 'tipo': 'REDUNDANCIA',
-                'msg': "Scaler 'standard' e transformador 'StandardScaler' são redundantes",
-                'sugestao': 'Remova um deles para evitar duplicação'
+                'msg': "Scaler 'standard' e transformador 'StandardScaler' são redundantes — dupla normalização detectada",
+                'sugestao': "Remova 'scaler standard' OU remova 'StandardScaler' do pipeline"
             })
 
     return ctx

@@ -16,7 +16,6 @@ if __name__ == "__main__":
     split test_size=0.3, random_state=42
     scaler standard
     pipeline {
-        StandardScaler,
         PCA {
             n_components=2
         },

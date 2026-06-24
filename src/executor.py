@@ -8,6 +8,16 @@ from src.validator import (
     mapa_scalers_sklearn,
     mapa_metricas_sklearn
 )
+from src.config import MAPA_SCORE_FUNC
+
+
+def _resolver_params(nome, params):
+    """Resolve parâmetros especiais, ex: score_func string -> função sklearn."""
+    if nome == 'SelectKBest' and 'score_func' in params:
+        func_name = params['score_func']
+        params = dict(params)
+        params['score_func'] = MAPA_SCORE_FUNC.get(func_name, func_name)
+    return params
 
 
 COLUNAS_IGNORADAS = {'Id', 'id', 'ID', 'index', 'Unnamed: 0'}
@@ -24,6 +34,7 @@ def _construir_pipeline_sklearn(ctx):
         params = passo['params']
         if passo['tipo'] == 'transformador':
             cls = mapa_transformadores_sklearn[nome]
+            params = _resolver_params(nome, params)
         else:
             cls = mapa_modelos_sklearn[nome][ctx['problema']]
         steps.append((f"{nome}_{len(steps)}", cls(**params)))
@@ -149,6 +160,7 @@ def executar(ctx):
                 return None
 
             try:
+                params = _resolver_params(nome, params)
                 transformador = transformador_class(**params)
                 X_treino_atual = transformador.fit_transform(X_treino_atual)
                 X_teste_atual = transformador.transform(X_teste_atual)

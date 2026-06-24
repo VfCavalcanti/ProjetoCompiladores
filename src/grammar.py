@@ -75,10 +75,16 @@ METRICA: "accuracy"
 MODELO: "RandomForest"
       | "SVM"
       | "LinearRegression"
+      | "GradientBoosting"
+      | "LogisticRegression"
+      | "Ridge"
+      | "Lasso"
 
 TRANSFORMADOR: "StandardScaler"
              | "PCA"
              | "SelectKBest"
+             | "RobustScaler"
+             | "PolynomialFeatures"
 
 TEST_SIZE: "test_size"
 RANDOM_STATE: "random_state"
@@ -90,7 +96,9 @@ BOOLEAN: "true" | "false"
 STRING: /"[^"]*"/
 IDENTIFIER: /[a-zA-Z_][a-zA-Z0-9_]*/
 COMENTARIO: /#.*/
+COMENTARIO_BLOCO: /\/\*[\s\S]*?\*\//
 
 %import common.WS
 %ignore WS
-%ignore COMENTARIO""")
+%ignore COMENTARIO
+%ignore COMENTARIO_BLOCO""")
