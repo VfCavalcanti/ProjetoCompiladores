@@ -41,8 +41,8 @@ def test_semantic_invalid_target():
     assert len(ctx['erros']) > 0
 
 
-def test_semantic_invalid_problem_model_combination():
-    """Testa incompatibilidade modelo-problema"""
+def test_semantic_invalid_metric_for_problem():
+    """Testa metrica incompativel com tipo de problema (accuracy em regression)"""
     code = """
     dataset "data/iris/Iris.csv"
     target SepalLengthCm
@@ -57,9 +57,7 @@ def test_semantic_invalid_problem_model_combination():
     """
     tree = gramatica.parse(code)
     ctx = analiseSemantica(tree)
-    # LinearRegression é regressão, RandomForest é regression, accuracy é classification
-    # Deve detectar erro
-    assert len(ctx['erros']) > 0
+    assert any(e['tipo'] == 'METRICA_INVALIDA' for e in ctx['erros'])
 
 
 def test_semantic_data_leakage_warning():

@@ -13,6 +13,7 @@ start: comando+
          | modelo
          | transformador
          | avaliacao
+         | crossval
 
 dataset: "dataset" STRING
 target: "target" IDENTIFIER
@@ -20,6 +21,7 @@ problema: "problem" PROBLEMA
 split: "split" param_split ("," param_split)*
 scaler: "scaler" SCALER
 avaliacao: "evaluate" METRICA
+crossval: "crossvalidation" param_cv ("," param_cv)*
 
 modelo: MODELO params_modelo?
 transformador: TRANSFORMADOR params_transformador?
@@ -31,6 +33,9 @@ corpo_pipeline: passo_pipeline ("," passo_pipeline)*
 
 param_split: TEST_SIZE "=" NUMERO
            | RANDOM_STATE "=" NUMERO
+
+param_cv: CV_FOLDS "=" NUMERO
+        | CV_SCORING "=" METRICA
 
 ?params_modelo: "{" lista_params "}"
               | "(" lista_params_inline ")"
@@ -77,6 +82,8 @@ TRANSFORMADOR: "StandardScaler"
 
 TEST_SIZE: "test_size"
 RANDOM_STATE: "random_state"
+CV_FOLDS: "folds"
+CV_SCORING: "scoring"
 
 NUMERO: /-?[0-9]+(\.[0-9]+)?/
 BOOLEAN: "true" | "false"

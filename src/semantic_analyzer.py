@@ -1,4 +1,5 @@
 from lark import Token, Tree
+from pathlib import Path
 import pandas as pd
 from src.validator import (
     mapa_modelos,
@@ -6,6 +7,21 @@ from src.validator import (
     metricas_validas,
     params_validos
 )
+
+PROJECT_ROOT = Path(__file__).resolve().parents[1]
+
+
+def resolver_caminho_dataset(caminho):
+    """Resolve um caminho de dataset relativo ao CWD ou a raiz do projeto."""
+    p = Path(caminho)
+    if p.is_absolute() and p.exists():
+        return str(p)
+    if p.exists():
+        return str(p.resolve())
+    alternativo = (PROJECT_ROOT / p).resolve()
+    if alternativo.exists():
+        return str(alternativo)
+    return caminho
 
 def analiseSemantica(tree):
     ctx = {
@@ -20,6 +36,7 @@ def analiseSemantica(tree):
         'modelo_direto': None,
         'transformador_direto': None,
         'metrica': None,
+        'crossval': None,
         'erros': [],
         'warnings': []
     }
@@ -96,6 +113,17 @@ def analiseSemantica(tree):
                 })
             else:
                 spec = params_validos[nome][param]
+                tipo_esperado = spec.get('tipo')
+                if tipo_esperado is not None:
+                    tipo_ok = isinstance(valor, tipo_esperado)
+                    if tipo_esperado is float and isinstance(valor, int) and not isinstance(valor, bool):
+                        tipo_ok = True
+                    if not tipo_ok:
+                        ctx['erros'].append({
+                            'tipo': 'PARAMETRO_INVALIDO',
+                            'msg': f"'{param}' deve ser do tipo {tipo_esperado.__name__}, recebido: {type(valor).__name__} ({valor!r})"
+                        })
+                        continue
                 if 'min' in spec and valor < spec['min']:
                     ctx['erros'].append({
                         'tipo': 'PARAMETRO_INVALIDO',
@@ -121,16 +149,24 @@ def analiseSemantica(tree):
 
             case 'dataset':
                 caminho = no.children[0].value[1:-1]
+                caminho = resolver_caminho_dataset(caminho)
                 ctx['dataset'] = caminho
 
                 try:
                     df = pd.read_csv(caminho)
                     ctx['colunas'] = set(df.columns)
-                except:
-                    ctx['colunas'] = {
-                        'Species', 'SepalLengthCm', 'SepalWidthCm',
-                        'PetalLengthCm', 'PetalWidthCm'
-                    }
+                except FileNotFoundError:
+                    ctx['erros'].append({
+                        'tipo': 'DATASET_INVALIDO',
+                        'msg': f"Arquivo de dataset nao encontrado: '{caminho}'",
+                        'sugestao': 'Verifique o caminho relativo ao diretorio de execucao'
+                    })
+                except (pd.errors.ParserError, pd.errors.EmptyDataError) as e:
+                    ctx['erros'].append({
+                        'tipo': 'DATASET_INVALIDO',
+                        'msg': f"Nao foi possivel ler '{caminho}': {e}",
+                        'sugestao': 'Confirme que o arquivo e um CSV valido'
+                    })
 
             case 'target':
                 target = extrair_nome(no.children[0])
@@ -376,6 +412,53 @@ def analiseSemantica(tree):
                         'sugestao': 'Adicione pelo menos um modelo ao pipeline'
                     })
 
+            case 'crossval':
+                params = {}
+                for filho in no.children:
+                    if isinstance(filho, Tree) and filho.data == 'param_cv':
+                        chave = str(filho.children[0])
+                        valor_tok = filho.children[1]
+                        if isinstance(valor_tok, Token):
+                            if valor_tok.type == 'NUMERO':
+                                valor = int(valor_tok.value) if '.' not in valor_tok.value else float(valor_tok.value)
+                            else:
+                                valor = str(valor_tok)
+                        else:
+                            valor = extrair_valor(valor_tok)
+                        params[chave] = valor
+
+                if 'folds' not in params:
+                    ctx['erros'].append({
+                        'tipo': 'PARAMETRO_INVALIDO',
+                        'msg': "crossvalidation exige parametro 'folds'",
+                        'sugestao': 'Use: crossvalidation folds=5'
+                    })
+                else:
+                    if not isinstance(params['folds'], int) or params['folds'] < 2:
+                        ctx['erros'].append({
+                            'tipo': 'PARAMETRO_INVALIDO',
+                            'msg': f"'folds' deve ser inteiro >= 2, recebido: {params['folds']}"
+                        })
+
+                if 'scoring' in params and ctx['problema']:
+                    validas = metricas_validas.get(ctx['problema'], set())
+                    if params['scoring'] not in validas:
+                        ctx['erros'].append({
+                            'tipo': 'METRICA_INVALIDA',
+                            'msg': f"scoring '{params['scoring']}' invalido para {ctx['problema']}",
+                            'sugestao': f"Validos: {', '.join(validas)}"
+                        })
+
+                if ctx['split_feito']:
+                    ctx['warnings'].append({
+                        'tipo': 'REDUNDANCIA',
+                        'msg': 'split e crossvalidation declarados juntos; split sera ignorado',
+                        'sugestao': 'Use apenas um dos dois'
+                    })
+
+                ctx['crossval'] = params
+                ctx['split_feito'] = True  # CV satisfaz a exigencia de particao
+
             case 'avaliacao':
                 metrica = extrair_nome(no.children[0])
 
@@ -424,11 +507,11 @@ def analiseSemantica(tree):
             'sugestao': 'Use "evaluate" para avaliar o modelo'
         })
 
-    if ctx['pipeline'] and not ctx['split_feito']:
+    if ctx['pipeline'] and not ctx['split_feito'] and not ctx['crossval']:
         ctx['erros'].append({
             'tipo': 'SEM_SPLIT',
             'msg': 'Nenhum split definido para treino/teste',
-            'sugestao': 'Defina "split" antes do modelo'
+            'sugestao': 'Defina "split" ou "crossvalidation" antes do modelo'
         })
 
     if ctx['pipeline']:

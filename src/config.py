@@ -88,7 +88,6 @@ PARAMS_VALIDOS = {
     },
     'LinearRegression': {
         'fit_intercept': {'tipo': bool},
-        'normalize': {'tipo': bool}
     },
     'PCA': {
         'n_components': {'tipo': int, 'min': 1},

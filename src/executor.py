@@ -1,12 +1,45 @@
+import numpy as np
 import pandas as pd
-from sklearn.model_selection import train_test_split
-from sklearn.preprocessing import LabelEncoder
+from sklearn.model_selection import train_test_split, cross_val_score, StratifiedKFold, KFold
+from sklearn.pipeline import Pipeline as SkPipeline
 from src.validator import (
     mapa_modelos_sklearn,
     mapa_transformadores_sklearn,
     mapa_scalers_sklearn,
     mapa_metricas_sklearn
 )
+
+
+COLUNAS_IGNORADAS = {'Id', 'id', 'ID', 'index', 'Unnamed: 0'}
+
+
+def _construir_pipeline_sklearn(ctx):
+    steps = []
+    if ctx.get('scaler'):
+        scaler_class = mapa_scalers_sklearn[ctx['scaler']]
+        steps.append(('scaler', scaler_class()))
+
+    for passo in ctx['pipeline']:
+        nome = passo['nome']
+        params = passo['params']
+        if passo['tipo'] == 'transformador':
+            cls = mapa_transformadores_sklearn[nome]
+        else:
+            cls = mapa_modelos_sklearn[nome][ctx['problema']]
+        steps.append((f"{nome}_{len(steps)}", cls(**params)))
+    return SkPipeline(steps)
+
+
+_SCORING_SKLEARN = {
+    'accuracy': 'accuracy',
+    'precision': 'precision_weighted',
+    'recall': 'recall_weighted',
+    'f1': 'f1_weighted',
+    'mse': 'neg_mean_squared_error',
+    'rmse': 'neg_root_mean_squared_error',
+    'mae': 'neg_mean_absolute_error',
+    'r2': 'r2',
+}
 
 def executar(ctx):
     """Executa o pipeline usando sklearn"""
@@ -34,14 +67,18 @@ def executar(ctx):
         print(f"    ERRO: Target '{target}' nao encontrado no dataset")
         return None
 
-    X = df.drop(target, axis=1)
+    cols_drop = [target] + [c for c in df.columns if c in COLUNAS_IGNORADAS]
+    X = df.drop(columns=cols_drop)
     y = df[target]
 
     print(f"    Target: {target}")
     print(f"    Features: {', '.join(X.columns.tolist())}")
     print(f"    Amostras: {len(X)}")
 
-    # 3. Split treino/teste
+    # 3. Cross-validation OU split treino/teste
+    if ctx.get('crossval'):
+        return _executar_crossval(ctx, X, y)
+
     print(f"\n[3] Dividindo dados em treino e teste")
 
     if not ctx['split']:
@@ -54,11 +91,19 @@ def executar(ctx):
     print(f"    test_size: {test_size}")
     print(f"    random_state: {random_state}")
 
+    stratify = None
+    if ctx['problema'] == 'classification':
+        contagem_min = y.value_counts().min()
+        if contagem_min >= 2:
+            stratify = y
+        else:
+            print(f"    AVISO: classe com {contagem_min} amostra(s), stratify desativado")
+
     X_treino, X_teste, y_treino, y_teste = train_test_split(
         X, y,
         test_size=test_size,
         random_state=random_state,
-        stratify=y if ctx['problema'] == 'classification' else None
+        stratify=stratify,
     )
 
     print(f"    Treino: {len(X_treino)} amostras")
@@ -172,19 +217,8 @@ def executar(ctx):
         return None
 
     try:
-        if ctx['problema'] == 'classification':
-            if isinstance(y_teste.iloc[0], str):
-                le = LabelEncoder()
-                y_teste_encoded = le.fit_transform(y_teste)
-                y_pred_encoded = le.transform(y_pred)
-                score = func_metrica(y_teste_encoded, y_pred_encoded)
-            else:
-                score = func_metrica(y_teste, y_pred)
-        else:
-            score = func_metrica(y_teste, y_pred)
-
+        score = func_metrica(y_teste, y_pred)
         print(f"    {metrica}: {score:.4f}")
-
     except Exception as e:
         print(f"    ERRO ao calcular metrica: {e}")
         return None
@@ -204,4 +238,54 @@ def executar(ctx):
         'y_teste': y_teste,
         'y_pred': y_pred,
         'score': score
+    }
+
+
+def _executar_crossval(ctx, X, y):
+    cv_cfg = ctx['crossval']
+    folds = cv_cfg['folds']
+    scoring_dsl = cv_cfg.get('scoring') or ctx.get('metrica') or (
+        'accuracy' if ctx['problema'] == 'classification' else 'r2'
+    )
+    scoring_sk = _SCORING_SKLEARN.get(scoring_dsl, scoring_dsl)
+
+    print(f"\n[3] Cross-validation ({folds} folds, scoring={scoring_dsl})")
+
+    pipe = _construir_pipeline_sklearn(ctx)
+
+    if ctx['problema'] == 'classification':
+        contagem_min = y.value_counts().min()
+        if contagem_min < folds:
+            print(f"    AVISO: classe com {contagem_min} amostra(s), usando KFold sem stratify")
+            cv = KFold(n_splits=folds, shuffle=True, random_state=42)
+        else:
+            cv = StratifiedKFold(n_splits=folds, shuffle=True, random_state=42)
+    else:
+        cv = KFold(n_splits=folds, shuffle=True, random_state=42)
+
+    try:
+        scores = cross_val_score(pipe, X, y, cv=cv, scoring=scoring_sk)
+    except Exception as e:
+        print(f"    ERRO no cross_val_score: {e}")
+        return None
+
+    if scoring_sk.startswith('neg_'):
+        scores = -scores
+
+    media = float(np.mean(scores))
+    desvio = float(np.std(scores))
+
+    print(f"    Scores por fold: {[round(s, 4) for s in scores.tolist()]}")
+    print(f"    {scoring_dsl}: {media:.4f} +/- {desvio:.4f}")
+
+    print("\n" + "=" * 70)
+    print("EXECUCAO (CV) CONCLUIDA COM SUCESSO")
+    print("=" * 70)
+
+    return {
+        'pipeline_sklearn': pipe,
+        'cv_scores': scores.tolist(),
+        'score': media,
+        'std': desvio,
+        'scoring': scoring_dsl,
     }
