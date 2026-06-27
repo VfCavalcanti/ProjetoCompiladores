@@ -1,6 +1,6 @@
 # ProjetoCompiladores
 
-Este projeto implementa um pequeno compilador/interpreter para uma DSL voltada a fluxos de Machine Learning. A linguagem permite descrever, em texto, um experimento com dataset, alvo, separação treino/teste, pré-processamento, pipeline de transformação/modelo e métrica de avaliação.
+Este projeto implementa um compilador/interpreter para uma DSL voltada a fluxos de Machine Learning. A linguagem permite descrever, em texto, um experimento completo: dataset, alvo, separação treino/teste, pré-processamento, pipeline de transformação/modelo, validação cruzada e métrica de avaliação.
 
 O fluxo geral é este:
 
@@ -13,16 +13,13 @@ O fluxo geral é este:
 O objetivo é funcionar como um interpretador de DSL para Machine Learning. Em vez de escrever diretamente código Python com scikit-learn, o usuário descreve o experimento em uma linguagem própria, por exemplo:
 
 ```text
-dataset "Iris.csv"
+dataset "data/iris/Iris.csv"
 target Species
 problem classification
 split test_size=0.3, random_state=42
 scaler standard
 pipeline {
-    StandardScaler,
-    PCA {
-        n_components=2
-    },
+    PCA { n_components=2 },
     RandomForest {
         n_estimators=100,
         max_depth=5,
@@ -34,9 +31,18 @@ evaluate accuracy
 
 Esse código define um experimento de classificação usando o dataset Iris, aplica divisão treino/teste, normalização, PCA, treino de RandomForest e avaliação por accuracy.
 
-## Estrutura do projeto
+### Comentários
 
-O projeto agora está bem organizado para facilitar extensões:
+A DSL suporta comentários de linha e de bloco:
+
+```text
+# Isso é um comentário de linha
+
+/* Isso é um
+   comentário de bloco */
+```
+
+## Estrutura do projeto
 
 ```text
 ProjetoCompiladores/
@@ -46,24 +52,32 @@ ProjetoCompiladores/
 │   ├── grammar.py             # DSL (Lark)
 │   ├── semantic_analyzer.py   # Validação semântica
 │   ├── executor.py            # Execução (sklearn)
+│   ├── validator.py           # Re-exporta configurações de config.py
 │   └── config.py              # Configuração centralizada de modelos, métricas, etc
 │
 ├── data/
-│   ├── iris/                  # Dataset Iris
-│   │   └── Iris.csv
-│   └── (adicione outros datasets aqui)
+│   ├── iris/Iris.csv
+│   ├── breast_cancer/breast_cancer.csv
+│   ├── diabetes/diabetes.csv
+│   ├── digits/digits.csv
+│   └── wine/wine.csv
 │
-├── examples/                  # Scripts de demonstração
-│   ├── demo_iris.py          # Exemplo com Iris
-│   └── demo_custom.py        # Template para outro dataset
+├── examples/
+│   ├── demo_iris.py           # Classificação — Iris com PCA + RandomForest
+│   ├── demo_breast_cancer.py  # Classificação binária — Breast Cancer
+│   ├── demo_diabetes.py       # Regressão — Diabetes
+│   ├── demo_digits.py         # Classificação multi-classe — Digits
+│   ├── demo_wine.py           # Classificação — Wine
+│   ├── demo_crossval.py       # Exemplo com cross-validation
+│   └── demo_custom.py         # Template para dataset próprio
 │
-├── tests/                     # Testes unitários
-│   ├── test_parser.py        # Testa parser DSL
-│   ├── test_semantic.py      # Testa validação semântica
-│   └── test_executor.py      # Testa execução
+├── tests/
+│   ├── test_parser.py
+│   ├── test_semantic.py
+│   └── test_executor.py
 │
-├── requirements.txt           # Dependências
-├── requirements-dev.txt       # Dependências de desenvolvimento (pytest)
+├── requirements.txt
+├── requirements-dev.txt
 └── README.md
 ```
 
@@ -84,8 +98,6 @@ pip install -r requirements.txt
 
 ### 3. Executar o projeto
 
-O ponto de entrada é o arquivo `examples/demo_iris.py`:
-
 ```powershell
 python examples/demo_iris.py
 ```
@@ -99,106 +111,192 @@ pytest tests/
 
 Para criar seu próprio exemplo, use `examples/demo_custom.py` como template.
 
+## Referência da linguagem
+
+### Comandos disponíveis
+
+| Comando           | Descrição                                             |
+|-------------------|-------------------------------------------------------|
+| `dataset`         | Caminho para o arquivo CSV                            |
+| `target`          | Nome da coluna alvo                                   |
+| `problem`         | Tipo de problema: `classification` ou `regression`    |
+| `split`           | Divisão treino/teste (`test_size`, `random_state`)    |
+| `scaler`          | Normalização global: `standard` ou `minmax`           |
+| `pipeline { }`    | Sequência de transformadores seguidos de um modelo    |
+| `crossvalidation` | Validação cruzada (`folds`, `scoring` opcional)       |
+| `evaluate`        | Métrica de avaliação final                            |
+
+### Modelos suportados
+
+| Nome DSL             | Tipo                | Classificação | Regressão |
+|----------------------|---------------------|:---:|:---:|
+| `RandomForest`       | Ensemble            | ✅  | ✅  |
+| `SVM`                | Support Vector      | ✅  | ✅  |
+| `GradientBoosting`   | Ensemble            | ✅  | ✅  |
+| `LogisticRegression` | Linear              | ✅  | ❌  |
+| `LinearRegression`   | Linear              | ❌  | ✅  |
+| `Ridge`              | Linear regularizado | ❌  | ✅  |
+| `Lasso`              | Linear regularizado | ❌  | ✅  |
+
+**Parâmetros aceitos por modelo:**
+
+- **RandomForest:** `n_estimators` (int), `max_depth` (int), `random_state` (int)
+- **GradientBoosting:** `n_estimators` (int), `max_depth` (int), `learning_rate` (float), `random_state` (int)
+- **SVM:** `C` (float), `kernel` (`linear`, `rbf`, `poly`), `gamma` (`scale`, `auto`)
+- **LogisticRegression:** `C` (float), `max_iter` (int), `random_state` (int)
+- **LinearRegression:** `fit_intercept` (bool)
+- **Ridge:** `alpha` (float), `fit_intercept` (bool)
+- **Lasso:** `alpha` (float), `fit_intercept` (bool), `max_iter` (int)
+
+### Transformadores suportados
+
+| Nome DSL             | Parâmetros aceitos                                        |
+|----------------------|-----------------------------------------------------------|
+| `PCA`                | `n_components` (int), `random_state` (int)                |
+| `StandardScaler`     | —                                                         |
+| `RobustScaler`       | —                                                         |
+| `SelectKBest`        | `k` (int), `score_func` (`f_classif` ou `f_regression`)  |
+| `PolynomialFeatures` | `degree` (int, mínimo 2)                                  |
+
+### Métricas disponíveis
+
+- **Classificação:** `accuracy`, `precision`, `recall`, `f1`
+- **Regressão:** `mse`, `rmse`, `mae`, `r2`
+
+### Cross-validation
+
+O comando `crossvalidation` pode substituir ou complementar o `split`. Quando usado:
+
+- Classificação usa `StratifiedKFold` automaticamente; cai para `KFold` se alguma classe tiver menos amostras que o número de folds.
+- Regressão usa `KFold`.
+- Se `split` e `crossvalidation` forem declarados juntos, o `split` é ignorado (warning emitido).
+
+```text
+crossvalidation folds=5, scoring=r2
+```
+
 ## Explicação de cada arquivo
 
 ### `src/main.py`
 
-Contém a função `compilar(codigo)`, que coordena todo o processo:
+Contém a função `compilar(codigo, verbose=False)`, que coordena todo o processo:
 
-1. imprime o código-fonte recebido;
-2. faz a análise sintática;
-3. faz a análise semântica;
-4. exibe erros e warnings;
-5. executa o pipeline se não houver erros.
+1. Faz a análise sintática;
+2. Faz a análise semântica;
+3. Exibe erros e warnings;
+4. Executa o pipeline se não houver erros;
+5. Retorna um dicionário com o resultado enriquecido.
 
-É o núcleo de orquestração do projeto.
+**Campos do resultado retornado:**
 
-Esse é o ponto de entrada lógico do compilador.
+| Campo               | Descrição                                              |
+|---------------------|--------------------------------------------------------|
+| `score`             | Valor da métrica avaliada                              |
+| `modelo_nome`       | Nome DSL do modelo utilizado                           |
+| `metrica`           | Nome da métrica                                        |
+| `n_features`        | Número de features após transformações                 |
+| `n_amostras_treino` | Amostras no conjunto de treino                         |
+| `n_amostras_teste`  | Amostras no conjunto de teste                          |
+| `pipeline_steps`    | Lista de passos executados (`tipo:nome`)               |
+| `warnings`          | Avisos semânticos não-bloqueantes                      |
+| `duracao_segundos`  | Tempo total de execução                                |
+| `cv_scores`         | Lista de scores por fold (apenas em cross-validation)  |
+| `std`               | Desvio padrão dos folds (apenas em cross-validation)   |
 
 ### `src/grammar.py`
 
-Define a gramática da DSL usando Lark. É aqui que estão as regras aceitas pela linguagem, como:
-
-- `dataset`
-- `target`
-- `problem`
-- `split`
-- `scaler`
-- `pipeline`
-- `evaluate`
-- `modelo`
-- `transformador`
-
-Também define os tokens válidos, como problemas (`classification`, `regression`), modelos (`RandomForest`, `SVM`, `LinearRegression`) e métricas.
-
-Esse arquivo concentra a definição da linguagem.
+Define a gramática da DSL usando Lark. É aqui que estão as regras aceitas pela linguagem: `dataset`, `target`, `problem`, `split`, `scaler`, `pipeline`, `crossvalidation`, `evaluate`, `modelo` e `transformador`. Também define os tokens válidos, como problemas, modelos, transformadores e métricas.
 
 ### `src/semantic_analyzer.py`
 
 Implementa a análise semântica. Depois que a sintaxe é aceita, este arquivo verifica se o código faz sentido do ponto de vista do domínio.
 
-Ele valida, por exemplo:
+**Erros detectados:**
 
-- se o dataset foi definido antes do `target`;
-- se o target existe nas colunas do CSV;
-- se o tipo de problema é válido;
-- se o `split` foi informado antes de etapas sensíveis;
-- se há risco de vazamento de dados ao aplicar transformadores antes da divisão;
-- se os parâmetros dos modelos e transformadores são válidos;
-- se a métrica é compatível com classification ou regression;
-- se o pipeline termina com um modelo.
+| Tipo                  | Descrição                                                          |
+|-----------------------|--------------------------------------------------------------------|
+| `DATASET_INVALIDO`    | Arquivo CSV não encontrado ou malformado                           |
+| `TARGET_INVALIDO`     | Coluna alvo não existe no dataset                                  |
+| `MODELO_INCOMPATIVEL` | Modelo não suporta o tipo de problema declarado                    |
+| `METRICA_INVALIDA`    | Métrica incompatível com o tipo de problema                        |
+| `VAZAMENTO_DADOS`     | Transformador ou scaler aplicado antes do split                    |
+| `PARAMETRO_INVALIDO`  | Parâmetro desconhecido, tipo errado ou fora do intervalo válido    |
+| `CONTEXTO_INVALIDO`   | Modelo ou transformador direto quando pipeline já existe           |
+| `PIPELINE_VAZIO`      | Pipeline declarado sem nenhum passo                                |
+| `PIPELINE_INCOMPLETO` | Pipeline termina com transformador em vez de modelo                |
+| `DEPENDENCIA_AUSENTE` | Comando dependente de outro não declarado antes                    |
+| `REDUNDANCIA`         | `scaler standard` + `StandardScaler` no pipeline (dupla normalização) |
+| `SEM_MODELO`          | Nenhum modelo definido no código                                   |
 
-Ao final, retorna um contexto com dados prontos para execução, além de erros e warnings.
+**Warnings** (não bloqueiam a execução):
 
-Esse arquivo valida as regras de domínio da DSL.
+| Tipo            | Descrição                                          |
+|-----------------|----------------------------------------------------|
+| `REDUNDANCIA`   | `split` e `crossvalidation` declarados juntos      |
+| `SEM_AVALIACAO` | Nenhuma métrica definida com `evaluate`            |
 
 ### `src/executor.py`
 
-Executa o pipeline já validado usando pandas e scikit-learn.
-
-O arquivo faz as seguintes etapas:
-
-- carrega o CSV;
-- separa features e target;
-- executa `train_test_split`;
-- aplica scaler, se houver;
-- executa os passos do pipeline;
-- treina o modelo final;
-- gera predições;
-- calcula a métrica final.
-
-Se algo falhar durante o processamento, a execução é interrompida e o erro é exibido.
-
-Esse arquivo executa o pipeline validado.
+Executa o pipeline já validado usando pandas e scikit-learn: carrega o CSV, separa features e target, executa `train_test_split`, aplica scaler, executa os passos do pipeline, treina o modelo e calcula a métrica. Suporta também execução via cross-validation quando `crossvalidation` é declarado.
 
 ### `src/config.py`
 
-Arquivo centralizado com configuração de modelos, transformadores, métricas e escaladores. 
+Arquivo centralizado com configuração de modelos, transformadores, métricas e escaladores.
 
-Contém:
-- Mapas de modelos sklearn e seus parâmetros válidos
-- Transformadores disponíveis
-- Escaladores (standard, minmax)
-- Métricas válidas por tipo de problema
-- Transformadores que causam vazamento de dados
+**Para adicionar um novo modelo, edite apenas este arquivo:**
 
-**Para adicionar novo modelo, simplesmente edite este arquivo e adicione:**
-1. Importe a classe sklearn no topo
-2. Adicione ao dicionário MAPA_MODELOS_SKLEARN
-3. Adicione aos PARAMS_VALIDOS
-4. Pronto!
+1. Importe a classe sklearn no topo:
+   ```python
+   from sklearn.ensemble import GradientBoostingClassifier, GradientBoostingRegressor
+   ```
+2. Adicione ao `MAPA_MODELOS_SKLEARN`:
+   ```python
+   'GradientBoosting': {
+       'classification': GradientBoostingClassifier,
+       'regression': GradientBoostingRegressor,
+   }
+   ```
+3. Adicione ao `MAPA_MODELOS` (mapa de strings para validação semântica):
+   ```python
+   'GradientBoosting': {
+       'classification': 'GradientBoostingClassifier',
+       'regression': 'GradientBoostingRegressor',
+   }
+   ```
+4. Adicione aos `PARAMS_VALIDOS`:
+   ```python
+   'GradientBoosting': {
+       'n_estimators': {'tipo': int, 'min': 1},
+       'learning_rate': {'tipo': float, 'min': 0},
+       'max_depth': {'tipo': int, 'min': 1},
+       'random_state': {'tipo': int},
+   }
+   ```
+5. Adicione o token `MODELO` em `src/grammar.py`:
+   ```
+   MODELO: "RandomForest"
+         | "SVM"
+         | "GradientBoosting"   ← aqui
+         | ...
+   ```
 
 ### `src/validator.py`
 
-Simplificado para importar configurações de `config.py`. Mantém a lógica de validação.
+Re-exporta as configurações de `config.py`. Mantém a separação de responsabilidades sem duplicar código.
 
-### `examples/demo_iris.py`
+### `examples/`
 
-Script de demonstração com dataset Iris (classificação com RandomForest + PCA).
+Scripts de demonstração prontos para rodar:
 
-### `examples/demo_custom.py`
-
-Template para criar seu próprio exemplo com outro dataset.
+```bash
+python examples/demo_iris.py           # Classificação — Iris
+python examples/demo_breast_cancer.py  # Classificação binária — Breast Cancer
+python examples/demo_diabetes.py       # Regressão — Diabetes
+python examples/demo_digits.py         # Classificação multi-classe — Digits
+python examples/demo_wine.py           # Classificação — Wine
+python examples/demo_crossval.py       # Cross-validation
+python examples/demo_custom.py         # Template para dataset próprio
+```
 
 ### `tests/`
 
@@ -207,60 +305,22 @@ Testes unitários usando pytest:
 - `test_semantic.py`: valida análise semântica
 - `test_executor.py`: valida execução do pipeline
 
-## Observações importantes
-
-- O projeto evita vazamento de dados: a ordem das instruções na DSL importa
-- Use `examples/demo_iris.py` como ponto de partida
-- A validação semântica é crucial: código válido sintaticamente pode ser rejeitado por regras de domínio
-
-## Como adicionar novos modelos
-
-1. Abra `src/config.py`
-2. Importe as classes sklearn no topo:
-   ```python
-   from sklearn.ensemble import GradientBoostingClassifier, GradientBoostingRegressor
-   ```
-3. Adicione ao `MAPA_MODELOS_SKLEARN`:
-   ```python
-   'GradientBoosting': {
-       'classification': GradientBoostingClassifier,
-       'regression': GradientBoostingRegressor,
-   }
-   ```
-4. Adicione os parâmetros válidos em `PARAMS_VALIDOS`:
-   ```python
-   'GradientBoosting': {
-       'n_estimators': {'tipo': int, 'min': 1},
-       'learning_rate': {'tipo': float, 'min': 0},
-       'max_depth': {'tipo': int, 'min': 1},
-   }
-   ```
-5. Use na DSL:
-   ```
-   pipeline {
-       GradientBoosting {
-           n_estimators=100,
-           learning_rate=0.1,
-           max_depth=5
-       }
-   }
-   ```
-
 ## Como adicionar novos datasets
 
 1. Crie uma pasta em `data/seu_dataset/`
 2. Coloque seu CSV lá (ex: `data/seu_dataset/dados.csv`)
-3. Use em `examples/demo_custom.py` ou crie um novo script
-4. Referencie na DSL:
-   ```
+3. Referencie na DSL:
+   ```text
    dataset "data/seu_dataset/dados.csv"
    target sua_coluna_alvo
    problem classification
    ```
 
-## Como rodar testes
+O caminho pode ser absoluto, relativo ao diretório de execução, ou relativo à raiz do projeto — o analisador semântico tenta as três formas automaticamente.
 
-```bash
-pip install -r requirements-dev.txt
-pytest tests/
-```
+## Observações importantes
+
+- A **ordem das instruções importa**: `dataset` antes de `target`, `split` antes de transformadores e modelos.
+- **Data leakage** é detectado automaticamente: transformadores como `PCA`, `StandardScaler`, `SelectKBest`, `RobustScaler` e `PolynomialFeatures` só podem ser usados dentro do pipeline, após o `split`.
+- O pipeline **deve terminar com um modelo**; terminar com transformador é erro semântico.
+- `crossvalidation` dispensa o `split` — mas declará-los juntos apenas emite um warning, não um erro.
